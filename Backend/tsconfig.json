@@ -1,0 +1,22 @@
+{
+  "compilerOptions": {
+    "module": "nodenext",            
+    "target": "esnext",              
+    "lib": ["esnext"],               
+    "types": ["node"],               
+
+    "noEmit": true,                  
+    "allowImportingTsExtensions": true,
+    "erasableSyntaxOnly": true,      
+    "verbatimModuleSyntax": true,    
+    "isolatedModules": true,         
+    "moduleDetection": "force",      
+
+    "strict": true,                  
+    "noUncheckedIndexedAccess": true, 
+    "noUncheckedSideEffectImports": true, 
+
+    "skipLibCheck": true             
+  },
+  "include": ["src"]                 
+}
