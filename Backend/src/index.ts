@@ -1,20 +1,14 @@
-// ─────────────────────────────────────────────
-// 1. Importer 
-// ─────────────────────────────────────────────
 import express from 'express';
 import cors from 'cors';
 import bcrypt from 'bcrypt';
 import pg from 'pg';
 import currencyRouter from './routes/currency.ts';
 
-// pg är ett äldre paket – importerar hela paketet
-// och plockar ut Pool på en egen rad
+
 const { Pool } = pg;
 
 
-// ─────────────────────────────────────────────
-// 2. Databas och app
-// ─────────────────────────────────────────────
+
 const pool = new Pool({ connectionString: process.env.DATABASE_URL });
 const app = express();
 
@@ -22,9 +16,7 @@ app.use(cors());
 app.use(express.json());
 app.use('/api/currency', currencyRouter);
 
-// ─────────────────────────────────────────────
-// 3. Produkter
-// ─────────────────────────────────────────────
+
 app.get('/products', async (req, res) => {
   const allproducts = await pool.query("SELECT * FROM Products");
   res.json(allproducts.rows);
@@ -61,9 +53,7 @@ app.delete('/products/:id', async (req, res) => {
   res.json({ meddelande: "Produkten är borttagen" });
 });
 
-// ─────────────────────────────────────────────
-// 4. Användare och inloggning
-// ─────────────────────────────────────────────
+
 app.post('/users', async (req, res) => {
   const { namn, email, password, adress, telefon, admin } = req.body;
   const hashat = await bcrypt.hash(password, 10);
@@ -79,24 +69,28 @@ app.post('/users', async (req, res) => {
 app.post('/login', async (req, res) => {
   const { email, password } = req.body;
   const nyLogin = await pool.query("SELECT * FROM users WHERE email = $1", [email]);
-
   const user = nyLogin.rows[0];
+
+  if (!user) {
+    res.status(401).json({ meddelande: "Fel email eller lösenord" });
+    return;
+  }
+
   const matchar = await bcrypt.compare(password, user.password);
 
-  if (matchar) {
-    res.json({
-      meddelande: "Inloggning lyckades",
-      admin: user.admin,
-      user_id: user.userid
-    });
-  } else {
-    res.json({ meddelande: "Fel lösenord" });
+  if (!matchar) {
+    res.status(401).json({ meddelande: "Fel email eller lösenord" });
+    return;
   }
+
+  res.json({
+    meddelande: "Inloggning lyckades",
+    admin: user.admin,
+    user_id: user.userid
+  });
 });
 
-// ─────────────────────────────────────────────
-// 5. Ordrar
-// ─────────────────────────────────────────────
+
 app.post('/orders', async (req, res) => {
   const { user_id, varor, pris, moms, frakt, leverans_namn, leverans_adress, leverans_telefon } = req.body;
 
@@ -134,9 +128,7 @@ app.patch('/orders/:id', async (req, res) => {
   res.json(uppdateradOrder.rows[0]);
 });
 
-// ─────────────────────────────────────────────
-// 6. Starta servern
-// ─────────────────────────────────────────────
+
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`Server körs på http://localhost:${PORT}`);
