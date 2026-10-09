@@ -12,11 +12,14 @@ import './App.css';
 import { AuthProvider } from './AuthContext';
 import ProtectedRoute from './ProtectedRoute';
 import Login from './pages/Login';
+import { CurrencyProvider } from './CurrencyContext';
+import CurrencySelect from './CurrencySelect';
 
 function App() {
   return (
     <AuthProvider>
     <CartProvider>
+    <CurrencyProvider>
     <BrowserRouter>
     <nav className='navbar'>
     <img src="/logo.png" alt="KLEOS" width="50" />
@@ -24,7 +27,7 @@ function App() {
     <Link to= "/kollektion">Kollektion</Link>
     <Link to= "/cart">Varukorg</Link>
     <Link to="/login">Logga in</Link>
-
+    <CurrencySelect />
 
     </nav>
       <Routes>
@@ -39,6 +42,7 @@ function App() {
         <Route path="/admin/orders" element={<ProtectedRoute><AdminOrders /></ProtectedRoute>} />
       </Routes>
     </BrowserRouter>
+    </CurrencyProvider>
     </CartProvider>
     </AuthProvider>
   );
