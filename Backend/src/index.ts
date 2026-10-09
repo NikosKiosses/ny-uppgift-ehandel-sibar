@@ -5,6 +5,7 @@ import express from 'express';
 import cors from 'cors';
 import bcrypt from 'bcrypt';
 import pg from 'pg';
+import currencyRouter from './routes/currency.ts';
 
 // pg är ett äldre paket – importerar hela paketet
 // och plockar ut Pool på en egen rad
@@ -19,6 +20,7 @@ const app = express();
 
 app.use(cors());
 app.use(express.json());
+app.use('/api/currency', currencyRouter);
 
 // ─────────────────────────────────────────────
 // 3. Produkter
