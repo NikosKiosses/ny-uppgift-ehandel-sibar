@@ -20,7 +20,9 @@ function Kollektion() {
     <div className="product-grid">
         {products.map(product => (
         <div className="product-card" key={product.productid}>
+            {product.product_img && (
             <img src={product.product_img} alt={product.product_beskr} />
+            )}
             <div className="product-card-body">
             <h3>{product.product_beskr}</h3>
             <p>{formatPrice(product.pris)}</p>
