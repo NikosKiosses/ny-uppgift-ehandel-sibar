@@ -11,7 +11,7 @@ function Kollektion() {
   const navigate = useNavigate();
   
   useEffect(() => {
-    fetch(`${API}products`)
+    fetch(`${API}/products/`)
       .then(res => res.json())
       .then(data => setProducts(data));
   }, []);
