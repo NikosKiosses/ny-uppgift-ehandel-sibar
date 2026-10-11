@@ -1,7 +1,7 @@
 import { createContext, useContext, useState } from 'react';
+import { API } from '../api';
 
 const AuthContext = createContext();
-const API = 'https://fsu25d-systemutveckling-uppgift-1-min-o0fb.onrender.com';
 
 export function AuthProvider({ children }) {
   const [isAdmin, setIsAdmin] = useState(localStorage.getItem('isAdmin') === 'true');
