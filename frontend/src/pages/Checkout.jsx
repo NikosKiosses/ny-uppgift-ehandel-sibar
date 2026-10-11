@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useCart } from '../CartContext';
 import { useCurrency } from '../CurrencyContext';            
+import { API } from '../api';
 
 function Checkout() {
   const { cart } = useCart();
@@ -21,7 +22,7 @@ function Checkout() {
       antal: 1
     }));
 
-    fetch('https://fsu25d-systemutveckling-uppgift-1-min-o0fb.onrender.com/orders', {
+    fetch(`${API}orders`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({

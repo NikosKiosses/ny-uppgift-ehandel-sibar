@@ -1,0 +1,1 @@
+export const API = 'https://ny-uppgift-ehandel-sibar.onrender.com';

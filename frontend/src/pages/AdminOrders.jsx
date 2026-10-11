@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react';
-
-const API = 'https://fsu25d-systemutveckling-uppgift-1-min-o0fb.onrender.com';
+import { API } from '../api';
 
 function AdminOrders() {
   const [orders, setOrders] = useState([]);

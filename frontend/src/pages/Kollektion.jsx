@@ -2,15 +2,16 @@ import { useState, useEffect } from 'react';
 import { useCart } from '../CartContext';
 import { useNavigate } from 'react-router-dom';
 import { useCurrency } from '../CurrencyContext';
+import { API } from '../api';
 
 function Kollektion() {
   const [products, setProducts] = useState([]);
   const { addToCart } = useCart();
   const { formatPrice } = useCurrency();
   const navigate = useNavigate();
-
+  
   useEffect(() => {
-    fetch('https://fsu25d-systemutveckling-uppgift-1-min-o0fb.onrender.com/products')
+    fetch(`${API}products`)
       .then(res => res.json())
       .then(data => setProducts(data));
   }, []);
