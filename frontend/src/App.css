@@ -111,3 +111,13 @@ body {
   border-radius: 4px;
   box-shadow: 0 1px 4px rgba(0,0,0,0.06);
 }
+
+.currency-select {
+  margin-left: auto;
+  background: #111;
+  color: #fff;
+  border: 1px solid #444;
+  border-radius: 4px;
+  padding: 6px 10px;
+  cursor: pointer;
+}

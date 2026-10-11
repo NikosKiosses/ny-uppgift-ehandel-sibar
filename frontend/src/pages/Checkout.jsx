@@ -1,9 +1,15 @@
 import { useState } from 'react';
 import { useCart } from '../CartContext';
+import { useCurrency } from '../CurrencyContext';            
 
 function Checkout() {
   const { cart } = useCart();
+  const { formatPrice, currency } = useCurrency();           
+
   const totalPris = cart.reduce((sum, item) => sum + Number(item.pris), 0);
+  const moms = Math.round(totalPris * 0.25);
+  const frakt = 49;
+  const attBetala = totalPris + moms + frakt; 
 
   const [namn, setNamn] = useState('');
   const [adress, setAdress] = useState('');
@@ -21,8 +27,8 @@ function Checkout() {
       body: JSON.stringify({
         user_id: 1,
         pris: totalPris,
-        moms: Math.round(totalPris * 0.25),
-        frakt: 49,
+        moms: moms,
+        frakt: frakt,
         varor: varor,
         leverans_namn: namn,
         leverans_adress: adress,
@@ -43,10 +49,19 @@ function Checkout() {
       <input placeholder="Adress" value={adress} onChange={(e) => setAdress(e.target.value)} style={{ display: 'block', marginBottom: '12px', width: '100%', padding: '8px' }} />
       <input placeholder="Telefon" value={telefon} onChange={(e) => setTelefon(e.target.value)} style={{ display: 'block', marginBottom: '12px', width: '100%', padding: '8px' }} />
 
-      <p>Delsumma: {totalPris} kr</p>
-      <p>Moms (25%): {Math.round(totalPris * 0.25)} kr</p>
-      <p>Frakt: 49 kr</p>
-      <p><strong>Totalt: {totalPris + Math.round(totalPris * 0.25) + 49} kr</strong></p>
+      {/* Visningen räknas om till vald valuta */}
+      <p>Delsumma: {formatPrice(totalPris)}</p>                      {/* ← ÄNDRAD */}
+      <p>Moms (25%): {formatPrice(moms)}</p>                         {/* ← ÄNDRAD */}
+      <p>Frakt: {formatPrice(frakt)}</p>                             {/* ← ÄNDRAD */}
+      <p><strong>Totalt: {formatPrice(attBetala)}</strong></p>       {/* ← ÄNDRAD */}
+
+      {/* Visas bara när man valt något annat än SEK */}
+      {currency !== 'SEK' && (
+        <p style={{ fontSize: '13px', color: '#666' }}>
+          Priserna visas i {currency}. Betalningen sker i SEK: {attBetala} kr.
+        </p>
+      )}
+
       <button className="btn" onClick={handleBetala}>Betala</button>
     </div>
   );

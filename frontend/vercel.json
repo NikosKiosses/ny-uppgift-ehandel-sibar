@@ -1,5 +1,9 @@
 {
   "rewrites": [
+    {
+      "source": "/api/(.*)",
+      "destination": "https://fsu25d-systemutveckling-uppgift-1-min-o0fb.onrender.com/api/$1"
+    },
     { "source": "/(.*)", "destination": "/index.html" }
   ]
 }

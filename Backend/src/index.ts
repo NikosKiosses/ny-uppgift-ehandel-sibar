@@ -1,17 +1,25 @@
-require('dotenv').config();
-const { Pool } = require('pg');
-const pool = new Pool ({connectionString : process.env.DATABASE_URL})
-const express = require('express');
+import express from 'express';
+import cors from 'cors';
+import bcrypt from 'bcrypt';
+import pg from 'pg';
+import currencyRouter from './routes/currency.ts';
+
+
+const { Pool } = pg;
+
+
+
+const pool = new Pool({ connectionString: process.env.DATABASE_URL });
 const app = express();
-const bcrypt = require('bcrypt');
-const cors = require('cors');
+
 app.use(cors());
-
-
 app.use(express.json());
-app.get ('/products', async (req,res) => { 
-    const allproducts = await pool.query("SELECT * FROM Products");
-    res.json(allproducts.rows);
+app.use('/api/currency', currencyRouter);
+
+
+app.get('/products', async (req, res) => {
+  const allproducts = await pool.query("SELECT * FROM Products");
+  res.json(allproducts.rows);
 });
 
 app.post('/products', async (req, res) => {
@@ -37,46 +45,51 @@ app.patch('/products/:id', async (req, res) => {
   res.json(uppdateradProdukt.rows[0]);
 });
 
-app.delete('/products/:id', async(req, res) => {
-    const id = req.params.id;
+app.delete('/products/:id', async (req, res) => {
+  const id = req.params.id;
 
-    const deleteProduct = await pool.query(
-        "DELETE FROM products WHERE productid = $1",
-        [id]
-    );
+  await pool.query("DELETE FROM products WHERE productid = $1", [id]);
 
-    res.json({ meddelande: "Produkten är borttagen"});
+  res.json({ meddelande: "Produkten är borttagen" });
 });
 
+
 app.post('/users', async (req, res) => {
-    const {namn, email, password, adress, telefon, admin} = req.body
-    const hashat = await bcrypt.hash(password, 10)
+  const { namn, email, password, adress, telefon, admin } = req.body;
+  const hashat = await bcrypt.hash(password, 10);
 
-    const nyAnv = await pool.query(
-        "INSERT INTO users (namn, email, password, adress, telefon, admin) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *",
-        [namn, email, hashat, adress, telefon, admin]
-    );
+  const nyAnv = await pool.query(
+    "INSERT INTO users (namn, email, password, adress, telefon, admin) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *",
+    [namn, email, hashat, adress, telefon, admin]
+  );
 
-    res.json(nyAnv.rows[0]);
+  res.json(nyAnv.rows[0]);
 });
 
 app.post('/login', async (req, res) => {
-    const {email, password} = req.body
-    const nyLogin = await pool.query("SELECT * FROM users WHERE email = $1", [email]);
-    
-    const user = nyLogin.rows[0];
-    const matchar = await bcrypt.compare(password, user.password);
+  const { email, password } = req.body;
+  const nyLogin = await pool.query("SELECT * FROM users WHERE email = $1", [email]);
+  const user = nyLogin.rows[0];
 
-    if (matchar) {
-        res.json({ 
-            meddelande: "Inloggning lyckades", 
-            admin: user.admin, 
-            user_id: user.userid 
-        });
-    } else {
-        res.json({ meddelande: "Fel lösenord" });
-    }
+  if (!user) {
+    res.status(401).json({ meddelande: "Fel email eller lösenord" });
+    return;
+  }
+
+  const matchar = await bcrypt.compare(password, user.password);
+
+  if (!matchar) {
+    res.status(401).json({ meddelande: "Fel email eller lösenord" });
+    return;
+  }
+
+  res.json({
+    meddelande: "Inloggning lyckades",
+    admin: user.admin,
+    user_id: user.userid
+  });
 });
+
 
 app.post('/orders', async (req, res) => {
   const { user_id, varor, pris, moms, frakt, leverans_namn, leverans_adress, leverans_telefon } = req.body;
@@ -99,8 +112,8 @@ app.post('/orders', async (req, res) => {
 });
 
 app.get('/orders', async (req, res) => {
-    const allaOrders = await pool.query("SELECT * FROM orders");
-    res.json(allaOrders.rows);
+  const allaOrders = await pool.query("SELECT * FROM orders");
+  res.json(allaOrders.rows);
 });
 
 app.patch('/orders/:id', async (req, res) => {
@@ -115,6 +128,8 @@ app.patch('/orders/:id', async (req, res) => {
   res.json(uppdateradOrder.rows[0]);
 });
 
-app.listen(process.env.PORT || 3000, () => {
-  console.log("Running server");
+
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => {
+  console.log(`Server körs på http://localhost:${PORT}`);
 });
