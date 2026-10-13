@@ -1,5 +1,6 @@
 const BASE_URL = process.env.CURRENCY_API_URL ?? 'https://api.frankfurter.dev/v1';
 const TIMEOUT_MS = 5000; // 5 sekunder
+import { fetchJson } from '../lib/fetchJson.ts';
 
 type FrankfurterResponse = {
   amount: number;
@@ -34,23 +35,7 @@ export async function getRates(
   url.searchParams.set('base', base);
   url.searchParams.set('symbols', symbols.filter((s) => s !== base).join(','));
 
-  // --- Problem 2 och 3: ingen anslutning eller för långsamt ---
-  let response: Response;
-  try {
-    response = await fetch(url, { signal: AbortSignal.timeout(TIMEOUT_MS) });
-  } catch (err) {
-    if (err instanceof Error && err.name === 'TimeoutError') {
-      throw new CurrencyError('Valutatjänsten svarade inte i tid', 504);
-    }
-    throw new CurrencyError('Kunde inte nå valutatjänsten', 502);
-  }
-
-  // --- Problem 1: servern svarade, men med ett fel ---
-  if (!response.ok) {
-    throw new CurrencyError(`Valutatjänsten svarade med status ${response.status}`, 502);
-  }
-
-  const data = (await response.json()) as FrankfurterResponse;
+const data = (await fetchJson(url.toString(), { timeoutMs: TIMEOUT_MS })) as FrankfurterResponse;
 
   return {
     base: data.base,
