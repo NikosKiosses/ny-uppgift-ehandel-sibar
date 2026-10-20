@@ -18,6 +18,7 @@ router.get('/rates', async (req, res) => {
   // Inget try/catch! Kastar getRates ett fel skickar Express 5
   // det vidare till error handlern i index.ts
   const kurser = await getRates(base, TILLÅTNA_VALUTOR);
+  res.set('X-Cache', kurser.fromCache ? 'HIT' : 'MISS');
   res.json(kurser);
 });
 
