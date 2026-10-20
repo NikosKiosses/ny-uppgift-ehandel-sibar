@@ -5,6 +5,11 @@ product_beskr TEXT,
 pris NUMERIC,
 benefits TEXT,
 frakt NUMERIC
+sku TEXT UNIQUE,
+ean TEXT,
+kategori TEXT,
+lagersaldo INTEGER NOT NULL DEFAULT 0,
+varianter TEXT[] NOT NULL DEFAULT '{}'
 );
 
 CREATE TABLE Recensioner (
