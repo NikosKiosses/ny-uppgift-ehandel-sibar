@@ -9,7 +9,7 @@ const FrankfurterResponse = z.object({
   amount: z.number(),
   base: z.string().length(3),                    // "SEK" – exakt 3 bokstäver
   date: z.iso.date(),                            // "2026-10-06"
-  rates: z.record(z.string().length(3), z.number()) // { "EUR": 0.091, "USD": 0.098 });
+  rates: z.record(z.string(), z.number().positive()) // { "EUR": 0.091, "USD": 0.098 });
 });
 
 // TypeScript-typen skapas FRÅN schemat – vi skriver fälten bara en gång
@@ -21,17 +21,6 @@ export type Rates = {
   rates: Record<string, number>;
 };
 
-// Vårt eget feltyp. Den bär med sig en HTTP-statuskod,
-// så att routen senare vet vad den ska svara React.
-export class CurrencyError extends Error {
-  status: number;
-
-  constructor(message: string, status = 502) {
-    super(message);          // skicka meddelandet vidare till Error
-    this.name = 'CurrencyError';
-    this.status = status;
-  }
-}
 
 export async function getRates(
   base = 'SEK',

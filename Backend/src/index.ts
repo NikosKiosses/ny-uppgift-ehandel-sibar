@@ -3,6 +3,7 @@ import cors from 'cors';
 import bcrypt from 'bcrypt';
 import pg from 'pg';
 import currencyRouter from './routes/currency.ts';
+import type { NextFunction, Request, Response } from 'express';
 
 
 const { Pool } = pg;
@@ -128,6 +129,19 @@ app.patch('/orders/:id', async (req, res) => {
   res.json(uppdateradOrder.rows[0]);
 });
 
+
+// ─────────────────────────────────────────────
+// Felhantering – fångar ALLA fel från ALLA routes
+// ─────────────────────────────────────────────
+app.use((err: unknown, req: Request, res: Response, _next: NextFunction) => {
+  const message = err instanceof Error ? err.message : String(err);
+
+  // Detaljerna → terminalen (för DIG)
+  console.error(`${req.method} ${req.originalUrl} failed: ${message}`);
+
+  // Kort meddelande → webbläsaren (för KUNDEN)
+  res.status(500).json({ error: 'Något gick fel på servern' });
+});
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
