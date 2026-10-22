@@ -13,6 +13,10 @@ app.use(express.json());
 app.use('/api/currency', currencyRouter);
 app.use('/api/admin', adminRouter);
 
+
+app.get('/api/health', (req, res) => {
+  res.json({ status: 'ok' });
+});
 // ─────────────────────────────────────────────
 // Produkter
 // ─────────────────────────────────────────────
