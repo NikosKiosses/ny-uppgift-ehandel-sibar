@@ -6,7 +6,6 @@ import type { NextFunction, Request, Response } from 'express';
 import { pool } from './db.ts';
 import adminRouter from './routes/admin.ts';
 
-
 const app = express();
 
 app.use(cors());
@@ -14,13 +13,15 @@ app.use(express.json());
 app.use('/api/currency', currencyRouter);
 app.use('/api/admin', adminRouter);
 
-
-app.get('/products', async (req, res) => {
+// ─────────────────────────────────────────────
+// Produkter
+// ─────────────────────────────────────────────
+app.get('/api/products', async (req, res) => {
   const allproducts = await pool.query("SELECT * FROM Products");
   res.json(allproducts.rows);
 });
 
-app.post('/products', async (req, res) => {
+app.post('/api/products', async (req, res) => {
   const { product_img, product_beskr, pris, benefits, frakt } = req.body;
 
   const nyProdukt = await pool.query(
@@ -31,7 +32,7 @@ app.post('/products', async (req, res) => {
   res.json(nyProdukt.rows[0]);
 });
 
-app.patch('/products/:id', async (req, res) => {
+app.patch('/api/products/:id', async (req, res) => {
   const { product_img, product_beskr, pris, benefits, frakt } = req.body;
   const id = req.params.id;
 
@@ -43,7 +44,7 @@ app.patch('/products/:id', async (req, res) => {
   res.json(uppdateradProdukt.rows[0]);
 });
 
-app.delete('/products/:id', async (req, res) => {
+app.delete('/api/products/:id', async (req, res) => {
   const id = req.params.id;
 
   await pool.query("DELETE FROM products WHERE productid = $1", [id]);
@@ -51,8 +52,10 @@ app.delete('/products/:id', async (req, res) => {
   res.json({ meddelande: "Produkten är borttagen" });
 });
 
-
-app.post('/users', async (req, res) => {
+// ─────────────────────────────────────────────
+// Användare och inloggning
+// ─────────────────────────────────────────────
+app.post('/api/users', async (req, res) => {
   const { namn, email, password, adress, telefon, admin } = req.body;
   const hashat = await bcrypt.hash(password, 10);
 
@@ -64,7 +67,7 @@ app.post('/users', async (req, res) => {
   res.json(nyAnv.rows[0]);
 });
 
-app.post('/login', async (req, res) => {
+app.post('/api/login', async (req, res) => {
   const { email, password } = req.body;
   const nyLogin = await pool.query("SELECT * FROM users WHERE email = $1", [email]);
   const user = nyLogin.rows[0];
@@ -88,8 +91,10 @@ app.post('/login', async (req, res) => {
   });
 });
 
-
-app.post('/orders', async (req, res) => {
+// ─────────────────────────────────────────────
+// Ordrar
+// ─────────────────────────────────────────────
+app.post('/api/orders', async (req, res) => {
   const { user_id, varor, pris, moms, frakt, leverans_namn, leverans_adress, leverans_telefon } = req.body;
 
   const nyOrder = await pool.query(
@@ -109,12 +114,12 @@ app.post('/orders', async (req, res) => {
   res.json(nyOrder.rows[0]);
 });
 
-app.get('/orders', async (req, res) => {
+app.get('/api/orders', async (req, res) => {
   const allaOrders = await pool.query("SELECT * FROM orders");
   res.json(allaOrders.rows);
 });
 
-app.patch('/orders/:id', async (req, res) => {
+app.patch('/api/orders/:id', async (req, res) => {
   const { orderstatus } = req.body;
   const id = req.params.id;
 
@@ -125,7 +130,6 @@ app.patch('/orders/:id', async (req, res) => {
 
   res.json(uppdateradOrder.rows[0]);
 });
-
 
 // ─────────────────────────────────────────────
 // Felhantering – fångar ALLA fel från ALLA routes

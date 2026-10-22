@@ -1,5 +1,7 @@
 import { useState, useEffect } from 'react';
 import { API } from '../api';
+import ImportPanel from '../ImportPanel';
+
 
 function AdminProducts() {
   const [products, setProducts] = useState([]);
@@ -8,7 +10,7 @@ function AdminProducts() {
   });
 
   const loadProducts = () => {
-    fetch(`${API}/products`)
+      fetch(`${API}/products`)
       .then(res => res.json())
       .then(data => setProducts(data));
   };
@@ -42,7 +44,7 @@ function AdminProducts() {
   return (
     <div>
       <h1>Admin - Produkter</h1>
-
+      <ImportPanel />
       <h2>Lägg till produkt</h2>
       <input name="product_img" placeholder="Bild-URL" value={form.product_img} onChange={handleChange} />
       <input name="product_beskr" placeholder="Beskrivning" value={form.product_beskr} onChange={handleChange} />
