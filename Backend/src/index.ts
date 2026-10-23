@@ -1,12 +1,13 @@
 import express from 'express';
 import cors from 'cors';
 import bcrypt from 'bcrypt';
+import { z } from 'zod';
 import type { NextFunction, Request, Response } from 'express';
 import { pool } from './db.ts';
 import currencyRouter from './routes/currency.ts';
 import adminRouter from './routes/admin.ts';
-import { syncProducts, syncRemoved, type ProductRow } from './integrations/searchAdapter.ts';
 import searchRouter from './routes/search.ts';
+import { syncProducts, syncRemoved, type ProductRow } from './integrations/searchAdapter.ts';
 
 const app = express();
 
@@ -26,13 +27,35 @@ app.get('/api/health', (req, res) => {
 // Ordningen vid ändringar: 1. databasen (sanningen) → 2. sökindexet (kopian).
 // Om Algolia strular är produkten ändå sparad, och svaret säger searchIndexed: false.
 // ─────────────────────────────────────────────
+
+// Det admin skickar in valideras innan det sparas.
+// Tomma fält ("") blir null – Postgres kan inte spara "" i en NUMERIC-kolumn.
+const emptyToNull = (v: unknown) => (v === '' || v === undefined ? null : v);
+
+const ProductInput = z.object({
+  product_img: z.preprocess(emptyToNull, z.string().trim().nullable()),
+  product_beskr: z.string({ error: 'Namn saknas' }).trim().min(1, 'Namn saknas'),
+  pris: z.coerce.number({ error: 'Priset måste vara ett tal' }).positive('Priset måste vara större än 0'),
+  benefits: z.preprocess(emptyToNull, z.string().trim().nullable()),
+  frakt: z.preprocess(
+    emptyToNull,
+    z.coerce.number({ error: 'Frakt måste vara ett tal' }).nonnegative('Frakt får inte vara negativ').nullable(),
+  ),
+});
+
 app.get('/api/products', async (req, res) => {
   const allproducts = await pool.query("SELECT * FROM Products");
   res.json(allproducts.rows);
 });
 
 app.post('/api/products', async (req, res) => {
-  const { product_img, product_beskr, pris, benefits, frakt } = req.body;
+  // 0. Validera det admin skickat
+  const input = ProductInput.safeParse(req.body);
+  if (!input.success) {
+    res.status(400).json({ error: input.error.issues.map((i) => i.message).join(', ') });
+    return;
+  }
+  const { product_img, product_beskr, pris, benefits, frakt } = input.data;
 
   // 1. Databasen först – den är sanningen
   const { rows } = await pool.query<ProductRow>(
@@ -47,7 +70,12 @@ app.post('/api/products', async (req, res) => {
 });
 
 app.patch('/api/products/:id', async (req, res) => {
-  const { product_img, product_beskr, pris, benefits, frakt } = req.body;
+  const input = ProductInput.safeParse(req.body);
+  if (!input.success) {
+    res.status(400).json({ error: input.error.issues.map((i) => i.message).join(', ') });
+    return;
+  }
+  const { product_img, product_beskr, pris, benefits, frakt } = input.data;
   const id = req.params.id;
 
   const { rows } = await pool.query<ProductRow>(
