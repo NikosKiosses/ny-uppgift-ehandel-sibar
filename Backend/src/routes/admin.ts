@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { pool } from '../db.ts';
 import { getSupplierCatalog } from '../integrations/supplierAdapter.ts';
-
+import { configureIndex, indexProducts, syncProducts, type ProductRow } from '../integrations/searchAdapter.ts';
 const router = Router();
 
 // VÅRA regler för en produkt innan den får sparas. Samma för CSV och XML.
@@ -33,8 +33,8 @@ const UPSERT_SQL = `
     pris          = EXCLUDED.pris,
     lagersaldo    = EXCLUDED.lagersaldo,
     varianter     = EXCLUDED.varianter
-  RETURNING (xmax = 0) AS inserted
-`;
+  RETURNING *, (xmax = 0) AS inserted
+  `;
 
 // POST /api/admin/products/import/csv  eller  /xml
 router.post('/products/import/:format', async (req, res) => {
@@ -48,13 +48,15 @@ router.post('/products/import/:format', async (req, res) => {
   // 2. Adaptern hämtar, tolkar och översätter. Routen vet inget om CSV, XML eller leverantörens fält.
   const candidates = await getSupplierCatalog(format);
 
-  const report = {
+    const report = {
     format,
     total: candidates.length,
     created: 0,
     updated: 0,
     skipped: [] as { sku: string; reason: string }[],
+    searchIndexed: true,
   };
+  const saved: ProductRow[] = [];   // allt som sparades → skickas till Algolia efteråt
 
   for (const candidate of candidates) {
     // 3. Validera EN produkt i taget – en trasig produkt stoppar inte resten
@@ -68,19 +70,40 @@ router.post('/products/import/:format', async (req, res) => {
 
     // 4. Spara med upsert
     const p = result.data;
-    const saved = await pool.query<{ inserted: boolean }>(UPSERT_SQL, [
+    const { rows } = await pool.query<ProductRow & { inserted: boolean }>(UPSERT_SQL, [
       p.sku, p.ean, p.name, p.category, p.price, p.stock, p.variants,
     ]);
+    const row = rows[0];
+    if (!row) continue;
 
-    if (saved.rows[0]?.inserted) report.created++;
+    if (row.inserted) report.created++;
     else report.updated++;
+    saved.push(row);
   }
 
-  // 5. Rapport till admin
+  // 5. Databasen är klar → uppdatera sökindexet i ETT anrop (inte 44 st)
+  report.searchIndexed = await syncProducts(saved);
+
+  // 6. Rapport till admin
   console.log(
     `[import] ${format.toUpperCase()}: ${report.created} new, ${report.updated} updated, ${report.skipped.length} skipped`,
   );
   res.json(report);
+});
+
+// POST /api/admin/search/reindex
+// Skickar ALLA produkter i databasen till Algolia. Behövs första gången,
+// och om indexet har hamnat efter databasen (t.ex. om Algolia var nere).
+router.post('/search/reindex', async (_req, res) => {
+  const { rows } = await pool.query<ProductRow>('SELECT * FROM products');
+  try {
+    await configureIndex();
+    const indexed = await indexProducts(rows);
+    res.json({ indexed });
+  } catch (err) {
+    console.error('[search] Could not reindex:', err);
+    res.status(502).json({ error: 'Sökindexet kunde inte uppdateras. Försök igen senare.' });
+  }
 });
 
 export default router;
