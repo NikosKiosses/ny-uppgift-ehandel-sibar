@@ -208,3 +208,8 @@ body {
   padding: 6px 10px;
   cursor: pointer;
 }
+
+.admin-message { margin: 12px 0; padding: 10px 14px; border-radius: 4px; }
+.admin-message-ok { background: #e6f4ea; color: #1e6b34; }
+.admin-message-warning { background: #fff4e0; color: #8a5300; }
+.admin-message-error { background: #fdecea; color: #a12622; }
