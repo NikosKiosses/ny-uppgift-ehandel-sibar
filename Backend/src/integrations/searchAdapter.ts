@@ -11,6 +11,9 @@ const ADMIN_KEY = process.env.ALGOLIA_ADMIN_KEY;   // får SKRIVA – bara på s
 const SEARCH_KEY = process.env.ALGOLIA_SEARCH_KEY; // får bara SÖKA
 const INDEX = process.env.ALGOLIA_INDEX;
 const TIMEOUT_MS = Number(process.env.ALGOLIA_TIMEOUT_MS ?? 5000);
+// Hur många gånger vi frågar Algolia "är du klar?" innan vi ger upp (~25 s vid 15).
+// Utan tak kan väntan pågå i flera minuter.
+const WAIT_RETRIES = Number(process.env.ALGOLIA_WAIT_RETRIES ?? 15);
 
 // Klienterna skapas först när de behövs. Saknas en nyckel kraschar inte hela
 // servern vid start – bara sök-anropet får ett tydligt fel.
@@ -111,11 +114,12 @@ const DEFAULT_RANKING = ['typo', 'geo', 'words', 'filters', 'proximity', 'attrib
 // Talar om för Algolia VAD som är sökbart, vad man får filtrera på och hur man sorterar.
 // Körs vid full omindexering – inställningarna sparas i indexet.
 export async function configureIndex(): Promise<void> {
+  console.log('[search] Configuring index and sort replicas');
   const primary = await admin().setSettings({
     indexName: INDEX!,
     indexSettings: { ...BASE_SETTINGS, replicas: [indexFor('price_asc'), indexFor('price_desc')] },
   });
-  await admin().waitForTask({ indexName: INDEX!, taskID: primary.taskID });
+  await admin().waitForTask({ indexName: INDEX!, taskID: primary.taskID, maxRetries: WAIT_RETRIES });
 
   // Replikerna: samma inställningar, men priset rankas FÖRST.
   // Vänta tills Algolia är klar, annars kan en sökning direkt efteråt få fel ordning.
@@ -124,8 +128,9 @@ export async function configureIndex(): Promise<void> {
       indexName: indexFor(sort),
       indexSettings: { ...BASE_SETTINGS, ranking: [rank, ...DEFAULT_RANKING] },
     });
-    await admin().waitForTask({ indexName: indexFor(sort), taskID: replica.taskID });
+    await admin().waitForTask({ indexName: indexFor(sort), taskID: replica.taskID, maxRetries: WAIT_RETRIES });
   }
+  console.log('[search] Index configured');
 }
 
 // Lägger till ELLER uppdaterar produkter (upsert på objectID).
@@ -134,7 +139,7 @@ export async function indexProducts(rows: ProductRow[]): Promise<number> {
   const records = rows.map(toRecord);
   console.log(`[search] Indexing ${records.length} product(s) in Algolia`);
   // waitForTasks: vänta tills Algolia är klar → en sökning direkt efteråt hittar ändringen
-  await admin().saveObjects({ indexName: INDEX!, objects: records, waitForTasks: true });
+  await admin().saveObjects({ indexName: INDEX!, objects: records, waitForTasks: true, maxRetries: WAIT_RETRIES });
   return records.length;
 }
 
@@ -142,7 +147,7 @@ export async function indexProducts(rows: ProductRow[]): Promise<number> {
 export async function removeProducts(objectIDs: string[]): Promise<void> {
   if (objectIDs.length === 0) return;
   console.log(`[search] Removing ${objectIDs.join(', ')} from Algolia`);
-  await admin().deleteObjects({ indexName: INDEX!, objectIDs, waitForTasks: true });
+  await admin().deleteObjects({ indexName: INDEX!, objectIDs, waitForTasks: true, maxRetries: WAIT_RETRIES });
 }
 
 // ─────────────────────────────────────────────
