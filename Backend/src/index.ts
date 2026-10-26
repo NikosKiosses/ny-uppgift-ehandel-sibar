@@ -8,14 +8,18 @@ import currencyRouter from './routes/currency.ts';
 import adminRouter from './routes/admin.ts';
 import searchRouter from './routes/search.ts';
 import { syncProducts, syncRemoved, type ProductRow } from './integrations/searchAdapter.ts';
+import checkoutRouter from './routes/checkout.ts';
+import stripeWebhookRouter from './routes/stripeWebhook.ts';
 
 const app = express();
 
 app.use(cors());
+app.use('/api/stripe/webhook', stripeWebhookRouter);
 app.use(express.json());
 app.use('/api/currency', currencyRouter);
 app.use('/api/admin', adminRouter);
 app.use('/api/search', searchRouter);
+app.use('/api/checkout', checkoutRouter);
 
 // Används för att hålla servern vaken och kolla att den lever
 app.get('/api/health', (req, res) => {
@@ -152,25 +156,6 @@ app.post('/api/login', async (req, res) => {
 // ─────────────────────────────────────────────
 // Ordrar
 // ─────────────────────────────────────────────
-app.post('/api/orders', async (req, res) => {
-  const { user_id, varor, pris, moms, frakt, leverans_namn, leverans_adress, leverans_telefon } = req.body;
-
-  const nyOrder = await pool.query(
-    "INSERT INTO orders (user_id, pris, moms, frakt, orderstatus, leverans_namn, leverans_adress, leverans_telefon) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *",
-    [user_id, pris, moms, frakt, "Beställd", leverans_namn, leverans_adress, leverans_telefon]
-  );
-
-  const orderId = nyOrder.rows[0].orderid;
-
-  for (const vara of varor) {
-    await pool.query(
-      "INSERT INTO orderrad (order_id, product_id, antal) VALUES ($1, $2, $3)",
-      [orderId, vara.product_id, vara.antal]
-    );
-  }
-
-  res.json(nyOrder.rows[0]);
-});
 
 app.get('/api/orders', async (req, res) => {
   const allaOrders = await pool.query("SELECT * FROM orders");

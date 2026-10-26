@@ -46,3 +46,11 @@ Order_ID INT REFERENCES Orders(OrderID),
 Product_ID INT REFERENCES Products(ProductID),
 antal INT
 );
+
+ALTER TABLE orders
+  ADD COLUMN stripe_session_id TEXT UNIQUE,
+  ADD COLUMN paid_at TIMESTAMPTZ,
+  ADD COLUMN created_at TIMESTAMPTZ NOT NULL DEFAULT now();
+
+ALTER TABLE orderrad
+  ADD COLUMN pris NUMERIC;

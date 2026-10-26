@@ -4,7 +4,6 @@ import Kollektion from './pages/Kollektion';
 import Productpage from './pages/Productpage';
 import Cart from './pages/Cart';
 import Checkout from './pages/Checkout';
-import Orderb from './pages/Orderb';
 import Sok from './pages/Sok';
 import Login from './pages/Login';
 import AdminProducts from './pages/AdminProducts';
@@ -15,6 +14,7 @@ import { AuthProvider } from './AuthContext';
 import { CartProvider } from './CartContext';
 import { CurrencyProvider } from './CurrencyContext';
 import './App.css';
+import Orderbekraftelse from './pages/Orderbekraftelse';
 
 function App() {
   return (
@@ -30,7 +30,7 @@ function App() {
               <Route path="/product" element={<Productpage />} />
               <Route path="/cart" element={<Cart />} />
               <Route path="/checkout" element={<Checkout />} />
-              <Route path="/orderb" element={<Orderb />} />
+              <Route path="/orderbekraftelse" element={<Orderbekraftelse />} />
               <Route path="/login" element={<Login />} />
               <Route path="/admin/products" element={<ProtectedRoute><AdminProducts /></ProtectedRoute>} />
               <Route path="/admin/orders" element={<ProtectedRoute><AdminOrders /></ProtectedRoute>} />
