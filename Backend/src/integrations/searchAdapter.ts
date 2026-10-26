@@ -111,26 +111,36 @@ const BASE_SETTINGS = {
 };
 const DEFAULT_RANKING = ['typo', 'geo', 'words', 'filters', 'proximity', 'attribute', 'exact', 'custom'];
 
-// Talar om för Algolia VAD som är sökbart, vad man får filtrera på och hur man sorterar.
-// Körs vid full omindexering – inställningarna sparas i indexet.
-export async function configureIndex(): Promise<void> {
-  console.log('[search] Configuring index and sort replicas');
-  const primary = await admin().setSettings({
-    indexName: INDEX!,
-    indexSettings: { ...BASE_SETTINGS, replicas: [indexFor('price_asc'), indexFor('price_desc')] },
-  });
-  await admin().waitForTask({ indexName: INDEX!, taskID: primary.taskID, maxRetries: WAIT_RETRIES });
-
-  // Replikerna: samma inställningar, men priset rankas FÖRST.
-  // Vänta tills Algolia är klar, annars kan en sökning direkt efteråt få fel ordning.
-  for (const [sort, rank] of [['price_asc', 'asc(price)'], ['price_desc', 'desc(price)']] as const) {
-    const replica = await admin().setSettings({
-      indexName: indexFor(sort),
-      indexSettings: { ...BASE_SETTINGS, ranking: [rank, ...DEFAULT_RANKING] },
-    });
-    await admin().waitForTask({ indexName: indexFor(sort), taskID: replica.taskID, maxRetries: WAIT_RETRIES });
+// Sparar inställningar i ett index – men BARA om de skiljer sig från det som redan finns.
+// Att ändra inställningar får Algolia att bygga om indexet, vilket kan ta lång tid.
+// Är allt redan rätt hoppar vi över det → omindexeringen går snabbt.
+async function applySettings(indexName: string, wanted: Record<string, string[]>): Promise<void> {
+  const current = (await admin().getSettings({ indexName })) as Record<string, unknown>;
+  const changed = Object.keys(wanted).filter(
+    (key) => JSON.stringify(current[key] ?? []) !== JSON.stringify(wanted[key]),
+  );
+  if (changed.length === 0) {
+    console.log(`[search] Settings for ${indexName} already up to date`);
+    return;
   }
-  console.log('[search] Index configured');
+  console.log(`[search] Updating ${changed.join(', ')} for ${indexName}`);
+  const task = await admin().setSettings({ indexName, indexSettings: wanted });
+  await admin().waitForTask({ indexName, taskID: task.taskID, maxRetries: WAIT_RETRIES });
+}
+
+// Talar om för Algolia VAD som är sökbart, vad man får filtrera på och hur man sorterar.
+// Körs vid full omindexering, men ändrar bara det som faktiskt behöver ändras.
+export async function configureIndex(): Promise<void> {
+  console.log('[search] Checking index settings');
+  await applySettings(INDEX!, {
+    ...BASE_SETTINGS,
+    replicas: [indexFor('price_asc'), indexFor('price_desc')],
+  });
+
+  // Replikerna: samma inställningar, men priset rankas FÖRST
+  for (const [sort, rank] of [['price_asc', 'asc(price)'], ['price_desc', 'desc(price)']] as const) {
+    await applySettings(indexFor(sort), { ...BASE_SETTINGS, ranking: [rank, ...DEFAULT_RANKING] });
+  }
 }
 
 // Lägger till ELLER uppdaterar produkter (upsert på objectID).
