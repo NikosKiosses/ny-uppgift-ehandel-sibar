@@ -51,3 +51,35 @@ och admin får en varning om att sökindexet inte är uppdaterat.
 | `inStock` | bara produkter i lager | `true`/`false` |
 
 Ogiltiga värden ger **400** med ett begripligt
+
+
+## Labb 3 – Betalning (Stripe Checkout)
+
+Kunden betalar på Stripes egen betalsida (hosted checkout). Kortuppgifter når aldrig
+vår server eller React – Stripe hanterar dem, och vi får besked via webhook.
+
+### Flödet
+1. React skickar bara `{ productid, antal }` och leveransuppgifter till `POST /api/checkout` – aldrig priset.
+2. Servern validerar varukorgen (Zod), hämtar **priserna från databasen** och kontrollerar lagersaldot.
+3. Ordern sparas som **Obetald** (order + orderrader i en transaktion), med priset vid köpet på varje rad.
+4. Servern skapar en Checkout Session med orderns id som `client_reference_id` och skickar kunden till Stripe.
+5. Stripe anropar `POST /api/stripe/webhook`. Signaturen verifieras – utan giltig signatur svarar vi 400.
+6. `checkout.session.completed` → ordern blir **Betald** och lagersaldot minskas, i en transaktion.
+   `checkout.session.expired` → ordern blir **Avbruten**.
+7. Kunden kommer tillbaka till `/orderbekraftelse`, som bara **visar** statusen – den ändrar den aldrig.
+
+### Säkerhet och robusthet
+- **Priset räknas på servern.** Ändras priset i webbläsaren påverkar det inte beloppet hos Stripe.
+- **Idempotent webhook.** Uppdateringen gäller bara ordrar som fortfarande är `Obetald`. Kommer samma
+  händelse två gånger händer ingenting andra gången – ordern blir inte betald två gånger och lagret
+  minskas bara en gång. En betald order kan aldrig bli avbruten.
+- **Webhooken svarar snabbt.** Databasen uppdateras först, Stripe får sitt svar, och sökindexet
+  (nytt lagersaldo) uppdateras efteråt.
+- **Timeout:** `STRIPE_TIMEOUT_MS` per anrop. Svarar inte Stripe får kunden ett begripligt meddelande
+  och ordern förblir obetald.
+- **Övergivna ordrar:** sessionen löper ut efter `CHECKOUT_EXPIRES_MINUTES` och ordern avbryts.
+
+### Testa lokalt
+`stripe listen --events checkout.session.completed,checkout.session.async_payment_succeeded,checkout.session.expired --forward-to localhost:3000/api/stripe/webhook`
+och lägg `whsec_...` som skrivs ut i `STRIPE_WEBHOOK_SECRET`. Testkort: `4242 4242 4242 4242`.
+Live används en egen webhook-endpoint i Stripe Dashboard med en egen `whsec_...`.
