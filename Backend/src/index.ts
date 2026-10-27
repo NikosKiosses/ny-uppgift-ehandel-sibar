@@ -7,17 +7,21 @@ import { pool } from './db.ts';
 import currencyRouter from './routes/currency.ts';
 import adminRouter from './routes/admin.ts';
 import searchRouter from './routes/search.ts';
-import { syncProducts, syncRemoved, type ProductRow } from './integrations/searchAdapter.ts';
 import checkoutRouter from './routes/checkout.ts';
 import stripeWebhookRouter from './routes/stripeWebhook.ts';
+import productImageRouter from './routes/productImage.ts';
+import { syncProducts, syncRemoved, type ProductRow } from './integrations/searchAdapter.ts';
 
 const app = express();
 
 app.use(cors());
+// Webhooken FÖRST: den behöver de råa bytesen för att kunna verifiera Stripes signatur.
+// Efter express.json() är de borta, och varje webhook skulle ge 400.
 app.use('/api/stripe/webhook', stripeWebhookRouter);
 app.use(express.json());
 app.use('/api/currency', currencyRouter);
 app.use('/api/admin', adminRouter);
+app.use('/api/admin', productImageRouter);
 app.use('/api/search', searchRouter);
 app.use('/api/checkout', checkoutRouter);
 
@@ -30,6 +34,7 @@ app.get('/api/health', (req, res) => {
 // Produkter
 // Ordningen vid ändringar: 1. databasen (sanningen) → 2. sökindexet (kopian).
 // Om Algolia strular är produkten ändå sparad, och svaret säger searchIndexed: false.
+// Bilden hanteras INTE här, bara via uppladdningen (routes/productImage.ts).
 // ─────────────────────────────────────────────
 
 // Det admin skickar in valideras innan det sparas.
@@ -37,7 +42,6 @@ app.get('/api/health', (req, res) => {
 const emptyToNull = (v: unknown) => (v === '' || v === undefined ? null : v);
 
 const ProductInput = z.object({
-  product_img: z.preprocess(emptyToNull, z.string().trim().nullable()),
   product_beskr: z.string({ error: 'Namn saknas' }).trim().min(1, 'Namn saknas'),
   pris: z.coerce.number({ error: 'Priset måste vara ett tal' }).positive('Priset måste vara större än 0'),
   benefits: z.preprocess(emptyToNull, z.string().trim().nullable()),
@@ -48,7 +52,7 @@ const ProductInput = z.object({
 });
 
 app.get('/api/products', async (req, res) => {
-  const allproducts = await pool.query("SELECT * FROM Products");
+  const allproducts = await pool.query("SELECT * FROM Products ORDER BY productid");
   res.json(allproducts.rows);
 });
 
@@ -59,12 +63,12 @@ app.post('/api/products', async (req, res) => {
     res.status(400).json({ error: input.error.issues.map((i) => i.message).join(', ') });
     return;
   }
-  const { product_img, product_beskr, pris, benefits, frakt } = input.data;
+  const { product_beskr, pris, benefits, frakt } = input.data;
 
   // 1. Databasen först – den är sanningen
   const { rows } = await pool.query<ProductRow>(
-    "INSERT INTO products (product_img, product_beskr, pris, benefits, frakt) VALUES ($1, $2, $3, $4, $5) RETURNING *",
-    [product_img, product_beskr, pris, benefits, frakt]
+    "INSERT INTO products (product_beskr, pris, benefits, frakt) VALUES ($1, $2, $3, $4) RETURNING *",
+    [product_beskr, pris, benefits, frakt]
   );
   const nyProdukt = rows[0]!;
 
@@ -79,12 +83,12 @@ app.patch('/api/products/:id', async (req, res) => {
     res.status(400).json({ error: input.error.issues.map((i) => i.message).join(', ') });
     return;
   }
-  const { product_img, product_beskr, pris, benefits, frakt } = input.data;
+  const { product_beskr, pris, benefits, frakt } = input.data;
   const id = req.params.id;
 
   const { rows } = await pool.query<ProductRow>(
-    "UPDATE products SET product_img = $1, product_beskr = $2, pris = $3, benefits = $4, frakt = $5 WHERE productid = $6 RETURNING *",
-    [product_img, product_beskr, pris, benefits, frakt, id]
+    "UPDATE products SET product_beskr = $1, pris = $2, benefits = $3, frakt = $4 WHERE productid = $5 RETURNING *",
+    [product_beskr, pris, benefits, frakt, id]
   );
   const uppdaterad = rows[0];
   if (!uppdaterad) {
@@ -154,11 +158,10 @@ app.post('/api/login', async (req, res) => {
 });
 
 // ─────────────────────────────────────────────
-// Ordrar
+// Ordrar (admin). Nya ordrar skapas BARA via /api/checkout – där räknas priset på servern.
 // ─────────────────────────────────────────────
-
 app.get('/api/orders', async (req, res) => {
-  const allaOrders = await pool.query("SELECT * FROM orders");
+  const allaOrders = await pool.query("SELECT * FROM orders ORDER BY orderid DESC");
   res.json(allaOrders.rows);
 });
 

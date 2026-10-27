@@ -266,6 +266,44 @@ body {
   cursor: not-allowed;
 }
 
+/* ───── Admin: produktlista med bild ───── */
+.admin-product {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+  max-width: 720px;
+  margin: 12px auto;
+  padding: 12px;
+  background: #fff;
+  border-radius: 4px;
+  text-align: left;
+}
+.admin-thumb {
+  width: 72px;
+  height: 72px;
+  object-fit: cover;
+  border-radius: 4px;
+  flex-shrink: 0;
+}
+.admin-thumb-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #eee;
+  color: #888;
+  font-size: 11px;
+}
+.admin-product-info { flex: 1; }
+.admin-product-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 6px;
+  align-items: center;
+}
+
+.admin-hint { color: #666; font-size: 13px; }
+
 .admin-message { margin: 12px 0; padding: 10px 14px; border-radius: 4px; }
 .admin-message-ok { background: #e6f4ea; color: #1e6b34; }
 .admin-message-warning { background: #fff4e0; color: #8a5300; }
