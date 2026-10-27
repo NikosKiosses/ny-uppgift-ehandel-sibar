@@ -83,3 +83,25 @@ vår server eller React – Stripe hanterar dem, och vi får besked via webhook.
 `stripe listen --events checkout.session.completed,checkout.session.async_payment_succeeded,checkout.session.expired --forward-to localhost:3000/api/stripe/webhook`
 och lägg `whsec_...` som skrivs ut i `STRIPE_WEBHOOK_SECRET`. Testkort: `4242 4242 4242 4242`.
 Live används en egen webhook-endpoint i Stripe Dashboard med en egen `whsec_...`.
+
+## Labb 4 – Produktbilder i molnlagring (Supabase Storage)
+
+Admin laddar upp en bild per produkt på admin-sidan. Filen skickas till vår egen server
+(`POST /api/admin/products/:id/image`, multipart/form-data), som laddar upp den till en publik
+bucket i Supabase Storage. Den hemliga nyckeln finns bara på servern – React anropar aldrig Supabase.
+
+### Validering i tre lager
+- **Admin-sidan** kontrollerar storleken innan filen skickas (snabb återkoppling). Reglerna hämtas
+  från servern (`GET /api/admin/image-rules`) – inget är hårdkodat i React.
+- **Servern** är den riktiga kontrollen: multer stoppar filer större än `IMAGE_MAX_MB`, och filtypen
+  avgörs av filens första bytes ("magiska nummer") – inte av filnamnet. En PDF som döpts om till
+  `.png` avvisas. Fel ger 400 med ett begripligt meddelande.
+- **Supabase-bucketen** har egna gränser (JPEG/PNG, 4 MB) som extra skyddsnät.
+
+### Byte av bild i rätt ordning
+1. Ny bild laddas upp till en **ny unik sökväg** (`products/<sku>/<uuid>.jpg`) – aldrig admins
+   filnamn, och en befintlig fil skrivs aldrig över (ny URL = ingen gammal bild i CDN-cachen).
+2. Bildens **URL** (för att visa) och **sökväg** (för att radera senare) sparas på produkten.
+3. **Först därefter** raderas den gamla filen.
+Misslyckas uppladdningen är ingenting ändrat – produkten behåller sin gamla bild. Svarar inte
+Supabase (timeout `SUPABASE_TIMEOUT_MS`) får admin ett begripligt meddelande.
