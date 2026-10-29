@@ -4,10 +4,8 @@ import { searchProducts, SORTS } from '../integrations/searchAdapter.ts';
 
 const router = Router();
 
-// Max antal produkter per sida läses från .env (standard 50)
 const MAX_PAGE_SIZE = Number(process.env.SEARCH_MAX_PAGE_SIZE ?? 50);
 
-// Data från ANVÄNDAREN (URL:en) valideras innan den skickas vidare till Algolia.
 const SearchQuery = z.object({
   q: z.string().trim().max(100, 'Söktexten får vara högst 100 tecken').default(''),
   page: z.coerce.number({ error: 'page måste vara ett tal' }).int('page måste vara ett heltal').min(1, 'page måste vara 1 eller större').default(1),
@@ -22,9 +20,7 @@ const SearchQuery = z.object({
   inStock: z.stringbool({ error: 'inStock måste vara true eller false' }).optional(),
 });
 
-// GET /api/search?q=hodie&page=2&pageSize=12&sort=price_asc&category=Hoodies&inStock=true
 router.get('/', async (req, res) => {
-  // 1. Validera parametrarna → 400 med begripligt fel
   const result = SearchQuery.safeParse(req.query);
   if (!result.success) {
     res.status(400).json({
@@ -34,7 +30,6 @@ router.get('/', async (req, res) => {
     return;
   }
 
-  // 2. Adaptern söker och svarar i VÅRT format
   try {
     res.json(await searchProducts(result.data));
   } catch (err) {

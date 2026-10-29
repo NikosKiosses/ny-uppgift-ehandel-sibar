@@ -1,9 +1,3 @@
-// Gemensam hjälp för ALLA anrop till externa tjänster:
-// timeout, retries på tillfälliga fel och kontroll av response.ok.
-// fetchJson  → för tjänster som svarar med JSON (t.ex. Frankfurter)
-// fetchBytes → för tjänster som skickar filer (t.ex. leverantörens CSV/XML)
-
-// Fel som kan gå över av sig själva → värda att försöka igen
 const RETRYABLE = new Set([408, 429, 500, 502, 503, 504]);
 const MAX_ATTEMPTS = 3;
 
@@ -12,7 +6,6 @@ type FetchOptions = {
   timeoutMs?: number;
 };
 
-// Kärnan: gör anropet med timeout och retries, och returnerar ett lyckat Response.
 async function fetchWithRetry(
   url: string,
   { headers = {}, timeoutMs = 5000 }: FetchOptions = {},
@@ -42,14 +35,11 @@ async function fetchWithRetry(
   throw new Error('Unreachable');
 }
 
-// JSON-svar. unknown = "kontrollera innan du använder det" (t.ex. med Zod).
 export async function fetchJson(url: string, options?: FetchOptions): Promise<unknown> {
   const response = await fetchWithRetry(url, options);
   return response.json();
 }
 
-// Filer: de RÅA bytesen plus Content-Type, så att anroparen själv kan avkoda
-// med rätt teckenkodning. (response.text() avkodar ALLTID som UTF-8.)
 export async function fetchBytes(
   url: string,
   options?: FetchOptions,

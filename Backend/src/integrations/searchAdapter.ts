@@ -1,28 +1,22 @@
-// Adapter för Algolia (sök).
-// Det här är den ENDA filen som vet hur Algolia fungerar: nycklar, index, format.
-// Resten av shoppen pratar bara med funktionerna här och får tillbaka SHOPPENS format.
-
 import { algoliasearch } from 'algoliasearch';
 import { z } from 'zod';
 
-// Allt som kan ändras ligger i .env – inget hårdkodat
 const APP_ID = process.env.ALGOLIA_APP_ID;
-const ADMIN_KEY = process.env.ALGOLIA_ADMIN_KEY;   // får SKRIVA – bara på servern
-const SEARCH_KEY = process.env.ALGOLIA_SEARCH_KEY; // får bara SÖKA
+const ADMIN_KEY = process.env.ALGOLIA_ADMIN_KEY;   
+const SEARCH_KEY = process.env.ALGOLIA_SEARCH_KEY; 
 const INDEX = process.env.ALGOLIA_INDEX;
 const TIMEOUT_MS = Number(process.env.ALGOLIA_TIMEOUT_MS ?? 5000);
-// Hur många gånger vi frågar Algolia "är du klar?" innan vi ger upp (~25 s vid 15).
-// Utan tak kan väntan pågå i flera minuter.
+
+
 const WAIT_RETRIES = Number(process.env.ALGOLIA_WAIT_RETRIES ?? 15);
 
-// Klienterna skapas först när de behövs. Saknas en nyckel kraschar inte hela
-// servern vid start – bara sök-anropet får ett tydligt fel.
+
+
 function client(key: string | undefined) {
   if (!APP_ID || !key || !INDEX) {
     throw new Error('ALGOLIA_APP_ID, ALGOLIA_ADMIN_KEY/ALGOLIA_SEARCH_KEY or ALGOLIA_INDEX is missing in .env');
   }
   return algoliasearch(APP_ID, key, {
-    // Timeout på varje anrop (ms). write får lite längre tid eftersom vi väntar på indexeringen.
     timeouts: { connect: TIMEOUT_MS, read: TIMEOUT_MS, write: TIMEOUT_MS * 2 },
   });
 }
@@ -31,11 +25,7 @@ let searchClient: ReturnType<typeof algoliasearch> | undefined;
 const admin = () => (adminClient ??= client(ADMIN_KEY));
 const search = () => (searchClient ??= client(SEARCH_KEY));
 
-// ─────────────────────────────────────────────
-// Modeller
-// ─────────────────────────────────────────────
 
-// En rad i products-tabellen (det pg ger oss). pris är NUMERIC → kommer som TEXT.
 export type ProductRow = {
   productid: number;
   sku: string | null;
@@ -47,7 +37,7 @@ export type ProductRow = {
   product_img: string | null;
 };
 
-// Så ser en produkt ut i SHOPPENS sökresultat
+
 export type SearchProduct = {
   id: number;
   sku: string | null;
@@ -59,8 +49,7 @@ export type SearchProduct = {
   image: string | null;
 };
 
-// Så ser en produkt ut i Algolia. objectID = artikelnumret → samma produkt uppdateras, dupliceras inte.
-// Egna produkter utan artikelnummer (skapade på admin-sidan) får "id-<productid>".
+
 const AlgoliaRecord = z.object({
   objectID: z.string(),
   id: z.number().int(),
@@ -92,12 +81,7 @@ function toRecord(row: ProductRow): AlgoliaRecord {
   };
 }
 
-// ─────────────────────────────────────────────
-// 1. INDEXERA – skriv till Algolia (admin-nyckeln)
-// ─────────────────────────────────────────────
 
-// Sortering i Algolia görs med REPLIKOR: kopior av indexet som rankar efter t.ex. pris.
-// Namnen byggs av indexnamnet i .env → products_price_asc osv. Inget hårdkodat index.
 export const SORTS = ['relevance', 'price_asc', 'price_desc'] as const;
 export type Sort = (typeof SORTS)[number];
 
@@ -106,14 +90,12 @@ function indexFor(sort: Sort): string {
 }
 
 const BASE_SETTINGS = {
-  searchableAttributes: ['name', 'category', 'sku'],  // ordningen = viktighet
-  attributesForFaceting: ['filterOnly(category)'],     // krävs för category-filtret
+  searchableAttributes: ['name', 'category', 'sku'],  
+  attributesForFaceting: ['filterOnly(category)'],    
 };
 const DEFAULT_RANKING = ['typo', 'geo', 'words', 'filters', 'proximity', 'attribute', 'exact', 'custom'];
 
-// Sparar inställningar i ett index – men BARA om de skiljer sig från det som redan finns.
-// Att ändra inställningar får Algolia att bygga om indexet, vilket kan ta lång tid.
-// Är allt redan rätt hoppar vi över det → omindexeringen går snabbt.
+
 async function applySettings(indexName: string, wanted: Record<string, string[]>): Promise<void> {
   const current = (await admin().getSettings({ indexName })) as Record<string, unknown>;
   const changed = Object.keys(wanted).filter(
@@ -128,8 +110,7 @@ async function applySettings(indexName: string, wanted: Record<string, string[]>
   await admin().waitForTask({ indexName, taskID: task.taskID, maxRetries: WAIT_RETRIES });
 }
 
-// Talar om för Algolia VAD som är sökbart, vad man får filtrera på och hur man sorterar.
-// Körs vid full omindexering, men ändrar bara det som faktiskt behöver ändras.
+
 export async function configureIndex(): Promise<void> {
   console.log('[search] Checking index settings');
   await applySettings(INDEX!, {
@@ -137,34 +118,26 @@ export async function configureIndex(): Promise<void> {
     replicas: [indexFor('price_asc'), indexFor('price_desc')],
   });
 
-  // Replikerna: samma inställningar, men priset rankas FÖRST
   for (const [sort, rank] of [['price_asc', 'asc(price)'], ['price_desc', 'desc(price)']] as const) {
     await applySettings(indexFor(sort), { ...BASE_SETTINGS, ranking: [rank, ...DEFAULT_RANKING] });
   }
 }
 
-// Lägger till ELLER uppdaterar produkter (upsert på objectID).
 export async function indexProducts(rows: ProductRow[]): Promise<number> {
   if (rows.length === 0) return 0;
   const records = rows.map(toRecord);
   console.log(`[search] Indexing ${records.length} product(s) in Algolia`);
-  // waitForTasks: vänta tills Algolia är klar → en sökning direkt efteråt hittar ändringen
   await admin().saveObjects({ indexName: INDEX!, objects: records, waitForTasks: true, maxRetries: WAIT_RETRIES });
   return records.length;
 }
 
-// Tar bort produkter ur Algolia – annars hittar sökningen produkter som inte finns.
 export async function removeProducts(objectIDs: string[]): Promise<void> {
   if (objectIDs.length === 0) return;
   console.log(`[search] Removing ${objectIDs.join(', ')} from Algolia`);
   await admin().deleteObjects({ indexName: INDEX!, objectIDs, waitForTasks: true, maxRetries: WAIT_RETRIES });
 }
 
-// ─────────────────────────────────────────────
-// Synk efter att DATABASEN redan är sparad.
-// Ett Algolia-fel får inte stoppa svaret – produkten finns ju i databasen.
-// Returnerar true/false så att routen kan tala om för admin om indexet hängde med.
-// ─────────────────────────────────────────────
+
 export async function syncProducts(rows: ProductRow[]): Promise<boolean> {
   try {
     await indexProducts(rows);
@@ -185,9 +158,6 @@ export async function syncRemoved(rows: Pick<ProductRow, 'productid' | 'sku'>[])
   }
 }
 
-// ─────────────────────────────────────────────
-// 2. SÖK – läs från Algolia (sök-nyckeln)
-// ─────────────────────────────────────────────
 
 export type SearchParams = {
   q: string;
@@ -199,7 +169,6 @@ export type SearchParams = {
 };
 
 export async function searchProducts({ q, page, pageSize, sort, category, inStock }: SearchParams) {
-  // Filter byggs av VALIDERADE parametrar. Citattecken i kategorin escapas.
   const filters: string[] = [];
   if (category) filters.push(`category:"${category.replace(/"/g, '\\"')}"`);
   if (inStock) filters.push('stock > 0');
@@ -209,13 +178,12 @@ export async function searchProducts({ q, page, pageSize, sort, category, inStoc
     indexName: indexFor(sort),
     searchParams: {
       query: q,
-      page: page - 1,            // Algolia räknar från 0, vi från 1
+      page: page - 1,          
       hitsPerPage: pageSize,
       filters: filters.join(' AND '),
     },
   });
 
-  // Extern data → kontrollera innan vi använder den. Trasiga träffar hoppas över.
   const data: SearchProduct[] = [];
   for (const hit of response.hits) {
     const parsed = AlgoliaRecord.safeParse(hit);

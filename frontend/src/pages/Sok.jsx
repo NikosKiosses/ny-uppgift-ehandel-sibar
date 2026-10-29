@@ -6,7 +6,6 @@ import { API } from '../api';
 
 const PAGE_SIZE = 12;
 
-// Sökresultatet har vårt sökformat – varukorgen vill ha samma format som Kollektion (databasens)
 const toCartItem = (p) => ({
   productid: p.id,
   product_beskr: p.name,
@@ -18,7 +17,6 @@ function Sok() {
   const { addToCart } = useCart();
   const { formatPrice } = useCurrency();
 
-  // Söktexten bor i URL:en (?q=hoodie) → headern och söksidan visar samma sak
   const [searchParams, setSearchParams] = useSearchParams();
   const q = searchParams.get('q') ?? '';
   const setQ = (value) => setSearchParams(value ? { q: value } : {}, { replace: true });
@@ -31,9 +29,8 @@ function Sok() {
   const [meta, setMeta] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
-  const [added, setAdded] = useState(null);   // id på senast tillagda produkt → "Tillagd ✓"
+  const [added, setAdded] = useState(null);  
 
-  // Ny söktext, sortering eller filter → börja om på sida 1
   useEffect(() => {
     setPage(1);
   }, [q, sort, inStock]);
@@ -41,7 +38,6 @@ function Sok() {
   useEffect(() => {
     const controller = new AbortController();
 
-    // Debounce: vänta 300 ms efter sista tangenttrycket innan vi söker
     const timer = setTimeout(async () => {
       const params = new URLSearchParams({ q, sort, page: String(page), pageSize: String(PAGE_SIZE) });
       if (inStock) params.set('inStock', 'true');

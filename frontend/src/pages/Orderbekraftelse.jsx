@@ -26,8 +26,6 @@ function Orderbekraftelse() {
     let attempts = 0;
     let timer;
 
-    // Sidan LÄSER bara statusen – den ändrar den aldrig. Det gör servern när webhooken kommer.
-    // Webhooken kan komma några sekunder efter kunden, så vi frågar igen en stund medan den är Obetald.
     const load = async () => {
       try {
         const res = await fetch(`${API}/checkout/order?session_id=${encodeURIComponent(sessionId)}`);
@@ -60,8 +58,16 @@ function Orderbekraftelse() {
       {order.items.map((item, i) => (
         <p key={i}>{item.antal} × {item.namn} – {Number(item.pris) * item.antal} kr</p>
       ))}
-      <p><strong>Totalt: {Number(order.pris)} kr</strong> (varav moms {Number(order.moms)} kr)</p>
-
+        <p>Frakt: {Number(order.frakt) === 0 ? 'Fri frakt' : `${Number(order.frakt)} kr`}</p>
+        {order.ombud_namn && (
+          <p>Hämtas hos ombud: <strong>{order.ombud_namn}</strong>, {order.ombud_adress}</p>
+        )}
+        {order.frakt_metod === 'home' && (
+          <p>Levereras hem till: {order.leverans_adress}, {order.leverans_postnummer} {order.leverans_ort}</p>
+        )}
+        <p>
+          <strong>Totalt: {Number(order.pris) + Number(order.frakt)} kr</strong> (varav moms {Number(order.moms)} kr)
+        </p>
       <Link to="/kollektion" className="btn" style={{ display: 'inline-block', marginTop: '16px', textDecoration: 'none' }}>
         Fortsätt handla
       </Link>

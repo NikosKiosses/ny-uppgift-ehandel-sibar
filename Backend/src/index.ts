@@ -11,12 +11,12 @@ import checkoutRouter from './routes/checkout.ts';
 import stripeWebhookRouter from './routes/stripeWebhook.ts';
 import productImageRouter from './routes/productImage.ts';
 import { syncProducts, syncRemoved, type ProductRow } from './integrations/searchAdapter.ts';
+import shippingRouter from './routes/shipping.ts';
 
 const app = express();
 
 app.use(cors());
-// Webhooken FÖRST: den behöver de råa bytesen för att kunna verifiera Stripes signatur.
-// Efter express.json() är de borta, och varje webhook skulle ge 400.
+
 app.use('/api/stripe/webhook', stripeWebhookRouter);
 app.use(express.json());
 app.use('/api/currency', currencyRouter);
@@ -24,21 +24,13 @@ app.use('/api/admin', adminRouter);
 app.use('/api/admin', productImageRouter);
 app.use('/api/search', searchRouter);
 app.use('/api/checkout', checkoutRouter);
+app.use('/api/shipping', shippingRouter);
 
-// Används för att hålla servern vaken och kolla att den lever
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok' });
 });
 
-// ─────────────────────────────────────────────
-// Produkter
-// Ordningen vid ändringar: 1. databasen (sanningen) → 2. sökindexet (kopian).
-// Om Algolia strular är produkten ändå sparad, och svaret säger searchIndexed: false.
-// Bilden hanteras INTE här, bara via uppladdningen (routes/productImage.ts).
-// ─────────────────────────────────────────────
 
-// Det admin skickar in valideras innan det sparas.
-// Tomma fält ("") blir null – Postgres kan inte spara "" i en NUMERIC-kolumn.
 const emptyToNull = (v: unknown) => (v === '' || v === undefined ? null : v);
 
 const ProductInput = z.object({
@@ -57,7 +49,6 @@ app.get('/api/products', async (req, res) => {
 });
 
 app.post('/api/products', async (req, res) => {
-  // 0. Validera det admin skickat
   const input = ProductInput.safeParse(req.body);
   if (!input.success) {
     res.status(400).json({ error: input.error.issues.map((i) => i.message).join(', ') });
@@ -65,14 +56,12 @@ app.post('/api/products', async (req, res) => {
   }
   const { product_beskr, pris, benefits, frakt } = input.data;
 
-  // 1. Databasen först – den är sanningen
   const { rows } = await pool.query<ProductRow>(
     "INSERT INTO products (product_beskr, pris, benefits, frakt) VALUES ($1, $2, $3, $4) RETURNING *",
     [product_beskr, pris, benefits, frakt]
   );
   const nyProdukt = rows[0]!;
 
-  // 2. Sedan sökindexet. Misslyckas det är produkten ändå sparad.
   const searchIndexed = await syncProducts([nyProdukt]);
   res.status(201).json({ ...nyProdukt, searchIndexed });
 });
@@ -103,7 +92,6 @@ app.patch('/api/products/:id', async (req, res) => {
 app.delete('/api/products/:id', async (req, res) => {
   const id = req.params.id;
 
-  // RETURNING ger oss sku:n vi behöver för att ta bort rätt post i Algolia
   const { rows } = await pool.query<ProductRow>(
     "DELETE FROM products WHERE productid = $1 RETURNING productid, sku",
     [id]
@@ -118,9 +106,6 @@ app.delete('/api/products/:id', async (req, res) => {
   res.json({ meddelande: "Produkten är borttagen", searchIndexed });
 });
 
-// ─────────────────────────────────────────────
-// Användare och inloggning
-// ─────────────────────────────────────────────
 app.post('/api/users', async (req, res) => {
   const { namn, email, password, adress, telefon, admin } = req.body;
   const hashat = await bcrypt.hash(password, 10);
@@ -157,9 +142,6 @@ app.post('/api/login', async (req, res) => {
   });
 });
 
-// ─────────────────────────────────────────────
-// Ordrar (admin). Nya ordrar skapas BARA via /api/checkout – där räknas priset på servern.
-// ─────────────────────────────────────────────
 app.get('/api/orders', async (req, res) => {
   const allaOrders = await pool.query("SELECT * FROM orders ORDER BY orderid DESC");
   res.json(allaOrders.rows);
@@ -177,16 +159,11 @@ app.patch('/api/orders/:id', async (req, res) => {
   res.json(uppdateradOrder.rows[0]);
 });
 
-// ─────────────────────────────────────────────
-// Felhantering – fångar ALLA fel från ALLA routes
-// ─────────────────────────────────────────────
 app.use((err: unknown, req: Request, res: Response, _next: NextFunction) => {
   const message = err instanceof Error ? err.message : String(err);
 
-  // Detaljerna → terminalen (för DIG)
   console.error(`${req.method} ${req.originalUrl} failed: ${message}`);
 
-  // Kort meddelande → webbläsaren (för KUNDEN)
   res.status(500).json({ error: 'Något gick fel på servern' });
 });
 

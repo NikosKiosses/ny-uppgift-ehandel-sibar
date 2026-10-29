@@ -4,7 +4,6 @@ import ImportPanel from '../ImportPanel';
 
 const EMPTY_FORM = { product_beskr: '', pris: '', benefits: '', frakt: '' };
 
-// Läser svaret som JSON – men kraschar inte om servern (eller en proxy) svarar med HTML/text
 async function readJson(res) {
   try {
     return await res.json();
@@ -16,13 +15,13 @@ async function readJson(res) {
 function AdminProducts() {
   const [products, setProducts] = useState([]);
   const [form, setForm] = useState(EMPTY_FORM);
-  const [editingId, setEditingId] = useState(null);   // null = lägg till, annars = ändra
-  const [message, setMessage] = useState(null);       // { type: 'ok' | 'warning' | 'error', text }
+  const [editingId, setEditingId] = useState(null);   
+  const [message, setMessage] = useState(null);     
 
-  const [rules, setRules] = useState(null);           // { maxMb, types } från servern
-  const [files, setFiles] = useState({});             // vald bildfil per produkt-id
+  const [rules, setRules] = useState(null);      
+  const [files, setFiles] = useState({});            
   const [uploadingId, setUploadingId] = useState(null);
-  const [imageMsg, setImageMsg] = useState({});       // meddelande VID produkten: { [id]: { type, text } }
+  const [imageMsg, setImageMsg] = useState({});       
 
   const loadProducts = () => {
     fetch(`${API}/products`)
@@ -32,7 +31,6 @@ function AdminProducts() {
 
   useEffect(() => {
     loadProducts();
-    // Bildreglerna kommer från servern (.env) – inget hårdkodat här
     fetch(`${API}/admin/image-rules`)
       .then((res) => res.json())
       .then(setRules)
@@ -43,7 +41,6 @@ function AdminProducts() {
     setForm({ ...form, [e.target.name]: e.target.value });
   };
 
-  // Talar om för admin om sökindexet hängde med (Labb 2-kravet)
   const resultMessage = (data, okText) =>
     data.searchIndexed === false
       ? { type: 'warning', text: `${okText}, men sökindexet kunde inte uppdateras. Sökningen visar gammal data tills du kör om indexeringen.` }
@@ -103,13 +100,11 @@ function AdminProducts() {
   const handleFileChange = (id, file) => {
     setFiles((prev) => ({ ...prev, [id]: file }));
     setMsgFor(id, null);
-    // Snabb kontroll INNAN vi skickar – servern kontrollerar ändå allt igen
     if (file && rules && file.size > rules.maxMb * 1024 * 1024) {
       setMsgFor(id, { type: 'error', text: `Bilden är för stor (${(file.size / 1024 / 1024).toFixed(1)} MB). Max ${rules.maxMb} MB.` });
     }
   };
 
-  // Bilden skickas till VÅR server som FormData – aldrig direkt till Supabase
   const handleUpload = async (id) => {
     const file = files[id];
     if (!file) return;
@@ -133,7 +128,6 @@ function AdminProducts() {
       setFiles((prev) => ({ ...prev, [id]: undefined }));
       loadProducts();
     } catch (err) {
-      // "Failed to fetch" = anslutningen bröts, oftast för att filen var för stor
       const text = err.message === 'Failed to fetch'
         ? 'Uppladdningen avbröts. Är filen för stor eller servern nere?'
         : err.message;
@@ -175,7 +169,7 @@ function AdminProducts() {
               <button onClick={() => handleDelete(p.productid)}>Ta bort</button>
             </div>
             <div className="admin-product-actions">
-              {/* Ingen accept-begränsning: servern avgör vad som är en giltig bild och svarar med ett tydligt fel */}
+              {}
               <input type="file" onChange={(e) => handleFileChange(p.productid, e.target.files[0])} />
               <button onClick={() => handleUpload(p.productid)} disabled={!files[p.productid] || uploadingId !== null}>
                 {uploadingId === p.productid ? 'Laddar upp…' : 'Ladda upp bild'}
