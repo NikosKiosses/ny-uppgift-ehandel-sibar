@@ -1,4 +1,5 @@
 import express from 'express';
+import cookieParser from 'cookie-parser';
 import cors from 'cors';
 import bcrypt from 'bcrypt';
 import { z } from 'zod';
@@ -7,6 +8,8 @@ import { pool } from './db.ts';
 import currencyRouter from './routes/currency.ts';
 import adminRouter from './routes/admin.ts';
 import searchRouter from './routes/search.ts';
+import authRouter from './routes/auth.ts';
+import accountRouter from './routes/account.ts';
 import checkoutRouter from './routes/checkout.ts';
 import stripeWebhookRouter from './routes/stripeWebhook.ts';
 import productImageRouter from './routes/productImage.ts';
@@ -19,12 +22,15 @@ app.use(cors());
 
 app.use('/api/stripe/webhook', stripeWebhookRouter);
 app.use(express.json());
+app.use(cookieParser());
 app.use('/api/currency', currencyRouter);
 app.use('/api/admin', adminRouter);
 app.use('/api/admin', productImageRouter);
 app.use('/api/search', searchRouter);
 app.use('/api/checkout', checkoutRouter);
 app.use('/api/shipping', shippingRouter);
+app.use('/api/auth', authRouter);
+app.use('/api/account', accountRouter); 
 
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok' });

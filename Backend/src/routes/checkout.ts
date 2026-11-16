@@ -6,6 +6,7 @@ import { findServicePoints, type ServicePoint } from '../integrations/shippingAd
 import { CartError, CartItems, priceCart } from '../lib/cart.ts';
 import { METHOD_NAMES, SHIPPING_METHODS, shippingPrice } from '../lib/shippingPrices.ts';
 import { PostalCode } from './shipping.ts';
+import { readCustomer } from '../lib/session.ts';
 
 const router = Router();
 
@@ -67,7 +68,8 @@ router.post('/', async (req, res) => {
   const fraktNamn = servicePoint ? `${METHOD_NAMES.service_point} (${servicePoint.name})` : METHOD_NAMES[c.shippingMethod];
   const total = cart.subtotal + frakt;
   const moms = Math.round(total * 0.2 * 100) / 100; 
-
+  const customer = readCustomer(req);
+  
   const db = await pool.connect();
   let orderId: number;
   try {
@@ -75,13 +77,13 @@ router.post('/', async (req, res) => {
     const { rows } = await db.query<{ orderid: number }>(
       `INSERT INTO orders (pris, moms, frakt, orderstatus,
          leverans_namn, leverans_adress, leverans_telefon, leverans_email, leverans_postnummer, leverans_ort,
-         frakt_metod, ombud_id, ombud_namn, ombud_adress)
-       VALUES ($1, $2, $3, 'Obetald', $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+         frakt_metod, ombud_id, ombud_namn, ombud_adress, customer_id)
+       VALUES ($1, $2, $3, 'Obetald', $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
        RETURNING orderid`,
       [
         cart.subtotal, moms, frakt,
         `${c.fornamn} ${c.efternamn}`, c.adress, c.telefon, c.email, c.postnummer, c.ort,
-        c.shippingMethod, servicePoint?.id ?? null, servicePoint?.name ?? null, servicePoint?.address ?? null,
+        c.shippingMethod, servicePoint?.id ?? null, servicePoint?.name ?? null, servicePoint?.address ?? null, customer?.id ?? null,
       ],
     );
     orderId = rows[0]!.orderid;

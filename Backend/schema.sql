@@ -54,3 +54,16 @@ ALTER TABLE orders
 
 ALTER TABLE orderrad
   ADD COLUMN pris NUMERIC;
+
+
+  
+CREATE TABLE customers (
+  customerid    SERIAL PRIMARY KEY,
+  google_sub    TEXT UNIQUE NOT NULL,
+  email         TEXT NOT NULL,
+  name          TEXT,
+  created_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
+  last_login_at TIMESTAMPTZ
+);
+
+ALTER TABLE orders ADD COLUMN customer_id INTEGER REFERENCES customers(customerid);

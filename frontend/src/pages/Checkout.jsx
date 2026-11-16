@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useCart } from '../CartContext';
 import { useCurrency } from '../CurrencyContext';
 import { API } from '../api';
+import { useCustomer } from '../CustomerContext';
 
 const formatDay = (iso) =>
   new Date(`${iso}T12:00:00`).toLocaleDateString('sv-SE', { weekday: 'long', day: 'numeric', month: 'numeric' });
@@ -22,6 +23,20 @@ function Checkout() {
   const [form, setForm] = useState({
     fornamn: '', efternamn: '', email: '', telefon: '', adress: '', postnummer: '', ort: '',
   });
+
+    const { customer } = useCustomer();
+  // Inloggad kund → fyll i namn och e-post från kontot (kunden kan ändra dem)
+  useEffect(() => {
+    if (!customer) return;
+    const [fornamn, ...rest] = customer.name.split(' ');
+    setForm((f) => ({
+      ...f,
+      fornamn: f.fornamn || fornamn,
+      efternamn: f.efternamn || rest.join(' '),
+      email: f.email || customer.email,
+    }));
+  }, [customer]);
+
   const [quote, setQuote] = useState(null);     
   const [quoteLoading, setQuoteLoading] = useState(false);
   const [quoteError, setQuoteError] = useState(null);
@@ -132,6 +147,9 @@ function Checkout() {
       ))}
 
       <h2>Leveransuppgifter</h2>
+            {customer
+        ? <p className="checkout-hint">Inloggad som {customer.name} – ordern sparas under Mina sidor.</p>
+        : <p className="checkout-hint">Vill du se ordern under Mina sidor? <a href="/mina-sidor">Logga in med Google</a> innan du betalar.</p>}
       <div className="checkout-row">
         <input name="fornamn" placeholder="Förnamn" value={form.fornamn} onChange={handleChange} style={inputStyle} />
         <input name="efternamn" placeholder="Efternamn" value={form.efternamn} onChange={handleChange} style={inputStyle} />

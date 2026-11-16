@@ -337,3 +337,17 @@ body {
 .admin-message-ok { background: #e6f4ea; color: #1e6b34; }
 .admin-message-warning { background: #fff4e0; color: #8a5300; }
 .admin-message-error { background: #fdecea; color: #a12622; }
+
+/* ───── Mina sidor ───── */
+.account { max-width: 640px; margin: 0 auto; text-align: left; }
+.account h2 { margin: 28px 0 12px; font-size: 18px; }
+.account-error { padding: 10px 14px; border-radius: 4px; background: #fdecea; color: #a12622; }
+.account-hint { color: #666; font-size: 13px; margin-top: 12px; }
+.btn-google { display: inline-block; text-decoration: none; margin-top: 8px; }
+.account-order { background: #fff; border: 1px solid #ddd; border-radius: 4px; padding: 14px; margin-bottom: 12px; }
+.account-order p { margin: 4px 0; }
+.account-order-head { display: flex; gap: 12px; align-items: center; margin-bottom: 8px; }
+.account-status { margin-left: auto; font-size: 12px; font-weight: 700; padding: 2px 8px; border-radius: 999px; background: #eee; }
+.status-Betald { background: #e6f4ea; color: #1e6b34; }
+.status-Obetald { background: #fff4e0; color: #8a5300; }
+.status-Avbruten { background: #fdecea; color: #a12622; }

@@ -1,12 +1,14 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useCart } from './CartContext';
+import { useCustomer } from './CustomerContext';
 import CurrencySelect from './CurrencySelect';
 
 function Navbar() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const { cart } = useCart();
+  const { customer } = useCustomer(); // inloggad kund (eller null)
 
   // Sökfältet visar det som står i URL:en (t.ex. när man är på /sok?q=hoodie)
   const [text, setText] = useState(searchParams.get('q') ?? '');
@@ -46,12 +48,13 @@ function Navbar() {
           />
         </form>
 
-        <Link to="/login" className="navbar-icon">
+        {/* Inloggad: kundens förnamn och länk till Mina sidor. Utloggad: "Logga in". */}
+        <Link to="/mina-sidor" className="navbar-icon">
           <svg viewBox="0 0 24 24" aria-hidden="true">
             <circle cx="12" cy="8" r="4" />
             <path d="M4 21c0-4 4-6 8-6s8 2 8 6" />
           </svg>
-          <span>Logga in</span>
+          <span>{customer ? customer.name.split(' ')[0] : 'Logga in'}</span>
         </Link>
 
         <Link to="/cart" className="navbar-icon">

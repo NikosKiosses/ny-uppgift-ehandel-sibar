@@ -4,6 +4,8 @@ import Kollektion from './pages/Kollektion';
 import Productpage from './pages/Productpage';
 import Cart from './pages/Cart';
 import Checkout from './pages/Checkout';
+import Orderbekraftelse from './pages/Orderbekraftelse';
+import MinaSidor from './pages/MinaSidor';
 import Sok from './pages/Sok';
 import Login from './pages/Login';
 import AdminProducts from './pages/AdminProducts';
@@ -13,12 +15,13 @@ import ProtectedRoute from './ProtectedRoute';
 import { AuthProvider } from './AuthContext';
 import { CartProvider } from './CartContext';
 import { CurrencyProvider } from './CurrencyContext';
+import { CustomerProvider } from './CustomerContext';
 import './App.css';
-import Orderbekraftelse from './pages/Orderbekraftelse';
 
 function App() {
   return (
     <AuthProvider>
+      <CustomerProvider>
       <CartProvider>
         <CurrencyProvider>
           <BrowserRouter>
@@ -31,6 +34,7 @@ function App() {
               <Route path="/cart" element={<Cart />} />
               <Route path="/checkout" element={<Checkout />} />
               <Route path="/orderbekraftelse" element={<Orderbekraftelse />} />
+              <Route path="/mina-sidor" element={<MinaSidor />} />
               <Route path="/login" element={<Login />} />
               <Route path="/admin/products" element={<ProtectedRoute><AdminProducts /></ProtectedRoute>} />
               <Route path="/admin/orders" element={<ProtectedRoute><AdminOrders /></ProtectedRoute>} />
@@ -38,6 +42,7 @@ function App() {
           </BrowserRouter>
         </CurrencyProvider>
       </CartProvider>
+      </CustomerProvider>
     </AuthProvider>
   );
 }
