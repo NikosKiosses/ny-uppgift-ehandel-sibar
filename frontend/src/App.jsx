@@ -16,6 +16,7 @@ import { AuthProvider } from './AuthContext';
 import { CartProvider } from './CartContext';
 import { CurrencyProvider } from './CurrencyContext';
 import { CustomerProvider } from './CustomerContext';
+import Integritetspolicy from './pages/Integritetspolicy';
 import './App.css';
 
 function App() {
@@ -38,6 +39,7 @@ function App() {
               <Route path="/login" element={<Login />} />
               <Route path="/admin/products" element={<ProtectedRoute><AdminProducts /></ProtectedRoute>} />
               <Route path="/admin/orders" element={<ProtectedRoute><AdminOrders /></ProtectedRoute>} />
+              <Route path="/integritetspolicy" element={<Integritetspolicy />} />
             </Routes>
           </BrowserRouter>
         </CurrencyProvider>

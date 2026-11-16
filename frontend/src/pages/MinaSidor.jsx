@@ -52,7 +52,8 @@ function MinaSidor() {
           Logga in med Google
         </a>
         <p className="account-hint">
-          Vi får bara ditt namn och din e-postadress från Google.
+          Vi får bara ditt namn och din e-postadress från Google.{' '}
+          <Link to="/integritetspolicy">Så hanterar vi dina uppgifter</Link>
         </p>
         <p className="account-hint">
           Admin? <Link to="/login">Logga in här</Link>
