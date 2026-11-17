@@ -2,6 +2,7 @@ import express, { Router } from 'express';
 import { pool } from '../db.ts';
 import { parseWebhook, type PaymentEvent } from '../integrations/paymentAdapter.ts';
 import { syncProducts, type ProductRow } from '../integrations/searchAdapter.ts';
+import { sendOrderConfirmation } from '../lib/orderConfirmation.ts';
 
 const router = Router();
 
@@ -30,6 +31,7 @@ router.post('/', express.raw({ type: 'application/json' }), async (req, res) => 
   res.json({ received: true });
 
   if (changedProducts.length > 0) void syncProducts(changedProducts);
+  if (event.type === 'paid') void sendOrderConfirmation(event.orderId);
 });
 
 
