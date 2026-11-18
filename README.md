@@ -302,3 +302,136 @@ GDPR som måste stå i integritetspolicyn. **Algolia:** gratisplanen har gränse
 shoppen kostar det pengar, och sökindexet är en kopia som kan hamna efter databasen. **PostNord:** sandlådan och
 API:erna kan ändras – i Labb 5 hade det gamla leveranstids-API:et redan ersatts av V2. Adaptermönstret minskar
 riskerna: byter jag tjänst behöver bara en fil skrivas om.
+
+## Uppgift 2 – Konton och inloggning
+
+I den här uppgiften har jag byggt tre saker i min butik KLEOS:
+
+1. Kunder kan logga in med sitt Google-konto
+2. Inloggade kunder har en egen sida, **Mina sidor**, där de ser sina ordrar
+3. Kunden får ett mejl med orderbekräftelse när de har betalat
+
+---
+
+### Logga in med Google
+
+Jag använder Google för inloggning så att butiken slipper spara lösenord. Google sköter själva inloggningen och talar sen om för min backend vem kunden är.
+
+**Så här går det till steg för steg:**
+
+1. Kunden klickar på **Logga in med Google** på Mina sidor.
+2. Backend skapar två slumpkoder, `state` och `code_verifier`. De sparas i cookies som bara servern kan läsa. Sen skickas kunden vidare till Google.
+3. Kunden loggar in hos Google och godkänner.
+4. Google skickar tillbaka kunden till min backend med en engångskod (`code`).
+5. Backend kollar att `state` är samma som innan. Är den inte det avbryts allt. Det skyddar mot att någon annan försöker starta en inloggning åt kunden.
+6. Backend byter koden mot kundens uppgifter direkt hos Google, server till server. Här skickas `code_verifier` med (det kallas **PKCE**). Det betyder att även om någon skulle sno koden så kan de inte använda den.
+7. Jag kollar svaret från Google med Zod: att det är till min app, att det inte gått ut och att e-posten är verifierad.
+8. Kunden sparas i tabellen `customers`. Är kunden redan där uppdateras bara namn och senaste inloggning.
+9. Kunden får en egen session från butiken och skickas till Mina sidor.
+
+Om kunden trycker **Avbryt** hos Google kommer man tillbaka till Mina sidor med ett vänligt meddelande i stället för ett fel.
+
+---
+
+### Vilka tokens finns och var sparas de?
+
+| Vad | Var | Hur länge |
+|---|---|---|
+| `state` och `code_verifier` | httpOnly-cookie | 10 min, tas bort direkt efter inloggning |
+| Koden från Google | I adressen när Google skickar tillbaka kunden | Kan bara användas en gång |
+| Googles token | Bara i serverns minne under inloggningen | Sparas **aldrig** |
+| Butikens session (JWT) | httpOnly-cookie som heter `session` | Så många timmar som `SESSION_HOURS` säger |
+
+Inget sparas i `localStorage`. Eftersom cookien är httpOnly kan inte JavaScript på sidan läsa den, och live är den också `Secure` så den bara skickas över https.
+
+---
+
+### Varför JWT i en cookie?
+
+Jag valde en JWT i stället för att spara sessioner i databasen.
+
+- **Bra:** jag behöver ingen sessionstabell, och kunden blir inte utloggad när Render startar om servern.
+- **Dåligt:** en JWT går inte att stänga av innan den går ut. Därför har den en kort livslängd, och när kunden loggar ut tas cookien bort.
+
+JWT:n innehåller bara kundens id, namn och e-post. Den är signerad med en hemlig nyckel så ingen kan ändra i den.
+
+---
+
+### Mina sidor
+
+- `/api/account/orders` kräver att man är inloggad. Annars blir svaret **401**.
+- Ordrarna hämtas med kund-id:t från sessionen, aldrig med ett id som skickas från webbläsaren. En kund kan alltså inte se någon annans ordrar. Det har jag testat med två olika Google-konton.
+- Handlar man inloggad kopplas ordern till kunden. Man kan fortfarande handla som gäst.
+- Är man inloggad fylls namn och e-post i automatiskt i kassan.
+
+---
+
+### Jag ber bara om det jag behöver
+
+- Från Google ber jag bara om `openid email profile`, alltså namn och e-post. Jag får inte tillgång till Gmail, Drive eller något annat.
+- Min Resend-nyckel kan bara skicka mejl, inget mer.
+- Kunden känns igen på Googles id (`sub`) och inte på e-posten, eftersom man kan byta e-post.
+
+---
+
+### Orderbekräftelse med Resend
+
+När Stripe säger att ordern är betald skickas ett mejl till kunden med vad de köpt, frakt och totalsumma.
+
+- **Webhooken svarar Stripe först**, sen skickas mejlet. Går något fel med mejlet påverkar det aldrig betalningen, ordern blir betald ändå.
+- **Inga dubbla mejl.** Stripe kan skicka samma webhook flera gånger, så jag skyddar på två sätt:
+  1. Jag skickar med en `Idempotency-Key` till Resend (`order-confirmation/<orderId>`).
+  2. Jag sparar Resends id i `orders.confirmation_email_id`. Finns det redan ett id skickas inget nytt mejl.
+- **Försöka igen.** Misslyckas mejlet är kolumnen fortfarande tom, så nästa gång webhooken kommer skickas mejlet.
+
+**Det här har jag testat:**
+- Vanligt köp → mejlet kommer fram
+- Samma webhook två gånger → bara ett mejl
+- Fel API-nyckel → ordern blir ändå betald och loggen visar att mejlet inte skickades
+- Rätt nyckel igen + skicka om webhooken → mejlet kommer fram
+
+---
+
+### Säkerhet och GDPR
+
+- Tabellen `customers` har **Row Level Security** på så att den inte kan läsas via Supabases öppna API.
+- Jag sparar bara det jag behöver: Google-id, e-post, namn och senaste inloggning.
+- Det finns en sida `/integritetspolicy` som förklarar vad jag sparar och varför. Den behövdes också för att publicera appen hos Google.
+- Alla nycklar ligger i `.env` lokalt och på Render live, aldrig i koden.
+
+---
+
+### Nya miljövariabler
+
+```
+GOOGLE_CLIENT_ID=
+GOOGLE_CLIENT_SECRET=
+GOOGLE_CALLBACK_URL=
+GOOGLE_TIMEOUT_MS=5000
+SESSION_TOKEN_SECRET=
+SESSION_HOURS=8
+RESEND_API_URL=https://api.resend.com
+RESEND_API_KEY=
+EMAIL_FROM=KLEOS <onboarding@resend.dev>
+RESEND_TIMEOUT_MS=5000
+```
+
+### Ändringar i databasen
+
+```sql
+CREATE TABLE customers (
+  customerid    SERIAL PRIMARY KEY,
+  google_sub    TEXT UNIQUE NOT NULL,
+  email         TEXT NOT NULL,
+  name          TEXT,
+  created_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
+  last_login_at TIMESTAMPTZ
+);
+ALTER TABLE customers ENABLE ROW LEVEL SECURITY;
+ALTER TABLE orders ADD COLUMN customer_id INTEGER REFERENCES customers(customerid);
+ALTER TABLE orders ADD COLUMN confirmation_email_id TEXT;
+```
+
+### Begränsning
+
+Jag använder Resends testavsändare `onboarding@resend.dev`. Den kan bara skicka mejl till e-posten som Resend-kontot är skapat med. Om butiken skulle gå live på riktigt behöver man verifiera en egen domän och byta `EMAIL_FROM`.
