@@ -50,8 +50,14 @@ const ProductInput = z.object({
 });
 
 app.get('/api/products', async (req, res) => {
-  const allproducts = await pool.query("SELECT * FROM Products ORDER BY productid");
-  res.json(allproducts.rows);
+  try {
+    const { rows } = await pool.query('SELECT * FROM products ORDER BY productid');
+    res.json(rows);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    console.error(`[products] Could not fetch products: ${message}`);
+    res.status(503).json({ error: 'Produkterna kan inte visas just nu. Försök igen om en stund.' });
+  }
 });
 
 app.post('/api/products', async (req, res) => {
